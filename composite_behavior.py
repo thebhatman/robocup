@@ -1,9 +1,12 @@
 import behavior
 import traceback
 import logging
+import traceback
 import sys
 import time
 from multiprocessing.dummy import Pool as ThreadPool
+from multiprocessing import Process
+from threading import Thread
 
 n_threads = 2
 
@@ -95,43 +98,47 @@ class CompositeBehavior(behavior.Behavior):
         self.spin()
         states = []
         def function_process(name):
-            save_stdout = sys.stdout
-            sys.stdout = open('./debug/'+ str(name) + '.txt','w')
-            try:
-                print("here____")
-                print 'Starting behaviour: {} at {}'.format(name,time.time())
-                info = self._subbehavior_info[name]
-                bhvr = info['behavior']
-                print("Behavior",bhvr)
+            # save_stdout = sys.stdout
+            # sys.stdout = open('./debug/'+ str(name) + '.txt','w')
+            # print("here____")
+            # print 'Starting behaviour: {} at {}'.format(name,time.time())
+            info = self._subbehavior_info[name]
+            bhvr = info['behavior']
+            # print("Behavior",bhvr)
 
-                # multi-robot behaviors always get spun
-                # only spin single robot behaviors when they have a robot
-                should_spin = True
+            # multi-robot behaviors always get spun
+            # only spin single robot behaviors when they have a robot
+            should_spin = True
 
-                # try executing the subbehavior
-                # if it throws an exception, catch it and pass it to the exception handler, which subclasses can override
-                if should_spin:
-                    try:
-                        # print("Behavior name",bhvr)
-                        if issubclass(bhvr.__class__, CompositeBehavior):
-                            bhvr.spin_cb()
-                        else:
-                            bhvr.spin()
-                    except:
-                        exc = sys.exc_info()[0]
-                        self.handle_subbehavior_exception(name, exc)
-            finally:
-                sys.stdout = save_stdout
+            # try executing the subbehavior
+            # if it throws an exception, catch it and pass it to the exception handler, which subclasses can override
+            if should_spin:
+                try:
+                    # print("Behavior name",bhvr)
+                    if issubclass(bhvr.__class__, CompositeBehavior):
+                        bhvr.spin_cb()
+                    else:
+                        bhvr.spin()
+                except:
+                    exc = sys.exc_info()[0]
+                    self.handle_subbehavior_exception(name, exc)
+
+        # n_threads = len(self._subbehavior_info.keys())
+        # # print 'Starting {} at {}'.format(n_threads, time.time())
+        # pool = ThreadPool(n_threads)
+        # pool.map(function_process, list(self._subbehavior_info.keys()))
+        # pool.close() 
+        # pool.join()
+        procs = []
+        for key in self._subbehavior_info.keys():
+            p = Process(target = function_process, args = (key,))
+            procs += [p]
+            p.start()
+        for p in procs:
+            p.join()
 
 
-        n_threads = len(self._subbehavior_info.keys())
-        print 'Starting {} at {}'.format(n_threads, time.time())
-        pool = ThreadPool(n_threads)
-        pool.map(function_process, list(self._subbehavior_info.keys()))
-        pool.close() 
-        pool.join()
-
-        print 'Completed at {}'.format(time.time())
+        # print 'Completed at {}'.format(time.time())
 
 
     ## Override point for exception handling
